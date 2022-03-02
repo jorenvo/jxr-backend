@@ -1,6 +1,7 @@
+use serde_json::{Result, Value};
 use std::process::Command;
 
-fn run_ripgrep(paths: &[&str], pattern: &str) -> String {
+fn run_ripgrep(paths: &[&str], pattern: &str) -> Vec<u8> {
     let mut command = Command::new("rg");
 
     command.arg("--json");
@@ -11,16 +12,40 @@ fn run_ripgrep(paths: &[&str], pattern: &str) -> String {
     }
 
     let output = command.output().expect("failed to execute process");
-    String::from_utf8(output.stdout).expect("ripgrep output is not utf8")
+    output.stdout
 }
 
 fn main() {
     println!("Hello, world!");
-    println!(
-        "{}",
-        run_ripgrep(
-            &["/Users/jvo/Code/jxr-backend", "/Users/jvo/Code/gb-emu"],
-            "ripgrep output is not utf8"
-        )
+
+    let grep_json = run_ripgrep(
+        &["/Users/jvo/Code/jxr-backend", "/Users/jvo/Code/gb-emu"],
+        "const",
     );
+
+    println!("{}", String::from_utf8(grep_json.clone()).unwrap());
+
+    // TODO: find a better way to split
+    for line in grep_json.split(|b| *b == b'\n') {
+        if line.is_empty() {
+            break;
+        }
+
+        // TODO: is there some struct we can use (maybe in grep-printer) instead of Value?
+        let json: Value = serde_json::from_slice(line).expect("json invalid");
+
+        let match_type = json["type"].as_str().unwrap();
+        match match_type {
+            "begin" => {
+                println!(
+                    "new file: {}",
+                    json["data"]["path"]["text"].as_str().unwrap()
+                )
+            }
+
+            _ => {
+                println!("unhandled type: {}", match_type);
+            }
+        }
+    }
 }
