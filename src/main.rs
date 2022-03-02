@@ -43,6 +43,14 @@ fn main() {
                 )
             }
 
+            "match" => {
+                println!(
+                    "match (@{}): {}",
+                    json["data"]["line_number"].as_u64().unwrap(),
+                    json["data"]["lines"]["text"].as_str().unwrap().trim()
+                );
+            }
+
             _ => {
                 println!("unhandled type: {}", match_type);
             }
