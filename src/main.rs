@@ -2,15 +2,14 @@
 extern crate rocket;
 use std::process::Command;
 
-fn run_ripgrep(paths: &[&str], pattern: &str) -> Vec<u8> {
+fn run_ripgrep(pattern: &str) -> Vec<u8> {
     let mut command = Command::new("rg");
+
+    // TODO: this should be configurable
+    command.current_dir("/Users/jvo/Code/jxr-frontend/dist/jxr-code");
 
     command.arg("--json");
     command.arg(pattern);
-
-    for path in paths {
-        command.arg(path);
-    }
 
     let output = command.output().expect("failed to execute process");
     output.stdout
@@ -33,13 +32,11 @@ fn rg_sequence_to_array(json: &mut Vec<u8>) {
 
 #[get("/search?<query>")]
 fn search(query: &str) -> String {
-    let mut grep_json = run_ripgrep(
-        &["/Users/jvo/Code/jxr-backend", "/Users/jvo/Code/gb-emu"],
-        query,
-    );
+    let mut grep_json = run_ripgrep(query);
 
     rg_sequence_to_array(&mut grep_json);
 
+    println!("finished searching for {}", query);
     String::from_utf8(grep_json).expect("rg did not return valid utf8")
 }
 
