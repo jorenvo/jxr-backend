@@ -2,17 +2,18 @@
 extern crate rocket;
 use std::{fs, process::Command};
 
+// TODO: this should be configurable
 const JXR_CODE_DIR: &str = "/Users/jvo/Code/jxr-frontend/dist/jxr-code";
 
 // TODO
 // - error handling
 // - construct JSON more rigidly with serde instead of using strings
 
-fn run_ripgrep(pattern: &str) -> Vec<u8> {
+fn run_ripgrep(tree: &str, pattern: &str) -> Vec<u8> {
     let mut command = Command::new("rg");
 
-    // TODO: this should be configurable
-    command.current_dir(JXR_CODE_DIR);
+    // TODO: directory traversal attack!
+    command.current_dir(format!("{}/{}", JXR_CODE_DIR, tree));
 
     command.arg("--json");
     command.arg(pattern);
@@ -36,9 +37,9 @@ fn rg_sequence_to_array(json: &mut Vec<u8>) {
     json.push(b']');
 }
 
-#[get("/search?<query>")]
-fn search(query: &str) -> String {
-    let mut grep_json = run_ripgrep(query);
+#[get("/search?<tree>&<query>")]
+fn search(tree: &str, query: &str) -> String {
+    let mut grep_json = run_ripgrep(tree, query);
 
     rg_sequence_to_array(&mut grep_json);
 
