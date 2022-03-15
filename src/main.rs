@@ -12,7 +12,7 @@ const JXR_CODE_DIR: &str = "/Users/jvo/Code/jxr-frontend/dist/jxr-code";
 // - check if we could construct our own deserialization types for serde
 
 fn parse_result(line: &str, options: &Options) -> Option<serde_json::Value> {
-    let json: serde_json::Value = serde_json::from_str(&line).expect("json was not well-formatted");
+    let json: serde_json::Value = serde_json::from_str(line).expect("json was not well-formatted");
 
     if options.path.is_some() && json["type"].as_str().expect("type wasn't a string") == "match" {
         if json["data"]["path"]["text"]
@@ -63,8 +63,8 @@ fn parse_options(query: &str) -> Options {
     let mut options: Options = Default::default();
 
     for part in query.split_whitespace() {
-        if part.starts_with(ID_PATH) {
-            options.path = Some(part[ID_PATH.len()..].to_string());
+        if let Some(path) = part.strip_prefix(ID_PATH) {
+            options.path = Some(path.to_string());
         } else {
             options.pattern = Some(part.to_string());
         }
