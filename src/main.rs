@@ -14,7 +14,12 @@ const JXR_CODE_DIR: &str = "/Users/jvo/Code/jxr-frontend/dist/jxr-code";
 fn parse_result(line: &str, options: &Options) -> Option<serde_json::Value> {
     let json: serde_json::Value = serde_json::from_str(line).expect("json was not well-formatted");
 
-    if options.path.is_some() && json["type"].as_str().expect("type wasn't a string") == "match" {
+    // always skip ends
+    if json["type"].as_str() == Some("end") {
+        return None;
+    }
+
+    if options.path.is_some() && json["type"].as_str() == Some("match") {
         if json["data"]["path"]["text"]
             .as_str()
             .expect("result didn't have path")
@@ -27,6 +32,14 @@ fn parse_result(line: &str, options: &Options) -> Option<serde_json::Value> {
     }
 
     Some(json)
+}
+
+fn pop_if_empty_begin(results: &mut Vec<serde_json::Value>) {
+    if let Some(last) = results.last() {
+        if last["type"].as_str() == Some("begin") {
+            results.pop();
+        }
+    }
 }
 
 fn run_ripgrep(tree: &str, options: &Options) -> String {
@@ -45,6 +58,13 @@ fn run_ripgrep(tree: &str, options: &Options) -> String {
     let output_utf8 = String::from_utf8(output).expect("rg did not return valid utf8");
     for line in output_utf8.lines() {
         if let Some(result) = parse_result(line, options) {
+            let result_type = result["type"].as_str();
+
+            // summary will be last
+            if result_type == Some("begin") || result_type == Some("summary") {
+                pop_if_empty_begin(&mut results);
+            }
+
             results.push(result);
         }
     }
