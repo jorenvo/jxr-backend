@@ -87,12 +87,16 @@ struct Options {
 fn parse_options(query: &str) -> Options {
     const ID_PATH: &str = "path:";
     const ID_TYPE: &str = "type:";
+    const ID_EXT: &str = "ext:";
     let mut options: Options = Default::default();
 
     for part in query.split_whitespace() {
         if let Some(path) = part.strip_prefix(ID_PATH) {
             options.path = Some(path.to_string());
         } else if let Some(type_) = part.strip_prefix(ID_TYPE) {
+            options.filetype = Some(type_.to_string());
+        } else if let Some(type_) = part.strip_prefix(ID_EXT) {
+            // TODO: implement with glob later
             options.filetype = Some(type_.to_string());
         } else {
             options.pattern = Some(part.to_string());
