@@ -50,6 +50,11 @@ fn run_ripgrep(tree: &str, options: &Options) -> String {
 
     command.arg("--json");
 
+    if let Some(filetype) = options.filetype.as_ref() {
+        command.arg("--type");
+        command.arg(filetype);
+    }
+
     // TODO: error properly here
     command.arg(options.pattern.as_ref().expect("no search pattern"));
 
@@ -75,16 +80,20 @@ fn run_ripgrep(tree: &str, options: &Options) -> String {
 #[derive(Default)]
 struct Options {
     path: Option<String>,
+    filetype: Option<String>,
     pattern: Option<String>,
 }
 
 fn parse_options(query: &str) -> Options {
     const ID_PATH: &str = "path:";
+    const ID_TYPE: &str = "type:";
     let mut options: Options = Default::default();
 
     for part in query.split_whitespace() {
         if let Some(path) = part.strip_prefix(ID_PATH) {
             options.path = Some(path.to_string());
+        } else if let Some(type_) = part.strip_prefix(ID_TYPE) {
+            options.filetype = Some(type_.to_string());
         } else {
             options.pattern = Some(part.to_string());
         }
