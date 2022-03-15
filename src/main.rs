@@ -121,20 +121,8 @@ fn trees() -> String {
     let paths: Vec<String> = paths
         .map(|p| p.unwrap().file_name().to_str().unwrap().to_string())
         .collect();
-    let mut json_array = "[".to_string();
-    for (i, path) in paths.iter().enumerate() {
-        json_array.push('"');
-        json_array.push_str(path);
-        json_array.push('"');
 
-        if i < paths.len() - 1 {
-            json_array.push(',');
-        }
-    }
-
-    json_array.push(']');
-
-    json_array
+    json!(paths).to_string()
 }
 
 #[launch]
