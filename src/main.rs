@@ -1,11 +1,13 @@
 #[macro_use]
 extern crate rocket;
-use std::{fs, process::Command};
+use std::{env, fs, process::Command};
 
+use rocket::{routes, State};
 use serde_json::json;
 
-// TODO: this should be configurable
-const JXR_CODE_DIR: &str = "/Users/jvo/Code/jxr-frontend/dist/jxr-code";
+struct JXRConfig {
+    code_dir: String,
+}
 
 // TODO
 // - error handling
@@ -42,11 +44,11 @@ fn pop_if_empty_begin(results: &mut Vec<serde_json::Value>) {
     }
 }
 
-fn run_ripgrep(tree: &str, options: &Options) -> String {
+fn run_ripgrep(code_dir: &str, tree: &str, options: &Options) -> String {
     let mut command = Command::new("rg");
 
     // TODO: directory traversal attack!
-    command.current_dir(format!("{}/{}", JXR_CODE_DIR, tree));
+    command.current_dir(format!("{}/{}", code_dir, tree));
 
     command.arg("--json");
 
@@ -107,17 +109,17 @@ fn parse_options(query: &str) -> Options {
 }
 
 #[get("/search?<tree>&<query>")]
-fn search(tree: &str, query: &str) -> String {
+fn search(config: &State<JXRConfig>, tree: &str, query: &str) -> String {
     let options = parse_options(query);
-    let grep_json = run_ripgrep(tree, &options);
+    let grep_json = run_ripgrep(&config.code_dir, tree, &options);
 
     println!("finished searching for {}", query);
     grep_json
 }
 
 #[get("/trees")]
-fn trees() -> String {
-    let paths = fs::read_dir(JXR_CODE_DIR).unwrap();
+fn trees(config: &State<JXRConfig>) -> String {
+    let paths = fs::read_dir(&config.code_dir).unwrap();
     let paths: Vec<String> = paths
         .map(|p| p.unwrap().file_name().to_str().unwrap().to_string())
         .collect();
@@ -127,5 +129,9 @@ fn trees() -> String {
 
 #[launch]
 fn rocket() -> _ {
-    rocket::build().mount("/", routes![search, trees])
+    rocket::build()
+        .manage(JXRConfig {
+            code_dir: env::var("JXR_CODE_DIR").expect("JXR_CODE_DIR is not set"),
+        })
+        .mount("/", routes![search, trees])
 }
