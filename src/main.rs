@@ -9,7 +9,7 @@ use serde_json::json;
 struct JXRState {
     code_dir: String,
     globs: Vec<String>,
-    global_rg_lock: Mutex<bool>,
+    global_rg_lock: Mutex<()>,
 }
 
 // TODO
@@ -155,7 +155,7 @@ fn rocket() -> _ {
         .manage(JXRState {
             code_dir: env::var("JXR_CODE_DIR").expect("JXR_CODE_DIR is not set"),
             globs: vec!["!*.po".to_string(), "!*.pot".to_string()],
-            global_rg_lock: Mutex::new(false),
+            global_rg_lock: Mutex::new(()),
         })
         .mount("/", routes![search, trees])
 }
