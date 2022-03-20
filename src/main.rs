@@ -1,18 +1,20 @@
 #[macro_use]
 extern crate rocket;
-use std::{env, fs, process::Command};
+use std::{env, fs, process::Command, sync::Mutex};
 
 use rocket::{routes, State};
 use serde_json::json;
 
-struct JXRConfig {
+struct JXRState {
     code_dir: String,
     globs: Vec<String>,
+    global_rg_lock: Mutex<bool>,
 }
 
 // TODO
 // - error handling
 // - check if we could construct our own deserialization types for serde
+// - remove global_rg_lock
 
 fn parse_result(line: &str, options: &Options) -> Option<serde_json::Value> {
     let json: serde_json::Value = serde_json::from_str(line).expect("json was not well-formatted");
@@ -45,7 +47,7 @@ fn pop_if_empty_begin(results: &mut Vec<serde_json::Value>) {
     }
 }
 
-fn run_ripgrep(config: &JXRConfig, tree: &str, options: &Options) -> String {
+fn run_ripgrep(config: &JXRState, tree: &str, options: &Options) -> String {
     let mut command = Command::new("rg");
 
     // TODO: directory traversal attack!
@@ -115,8 +117,12 @@ fn parse_options(query: &str) -> Options {
 }
 
 #[get("/search?<tree>&<query>")]
-fn search(config: &State<JXRConfig>, tree: &str, query: &str) -> String {
+fn search(config: &State<JXRState>, tree: &str, query: &str) -> String {
     let options = parse_options(query);
+    let _lock = config
+        .global_rg_lock
+        .lock()
+        .expect("unlocking global rg lock failed");
     let grep_json = run_ripgrep(config, tree, &options);
 
     println!("finished searching for {}", query);
@@ -124,7 +130,7 @@ fn search(config: &State<JXRConfig>, tree: &str, query: &str) -> String {
 }
 
 #[get("/trees")]
-fn trees(config: &State<JXRConfig>) -> String {
+fn trees(config: &State<JXRState>) -> String {
     let paths = fs::read_dir(&config.code_dir).unwrap();
     let paths: Vec<String> = paths
         .map(|p| p.unwrap().file_name().to_str().unwrap().to_string())
@@ -136,9 +142,10 @@ fn trees(config: &State<JXRConfig>) -> String {
 #[launch]
 fn rocket() -> _ {
     rocket::build()
-        .manage(JXRConfig {
+        .manage(JXRState {
             code_dir: env::var("JXR_CODE_DIR").expect("JXR_CODE_DIR is not set"),
             globs: vec!["!*.po".to_string(), "!*.pot".to_string()],
+            global_rg_lock: Mutex::new(false),
         })
         .mount("/", routes![search, trees])
 }
