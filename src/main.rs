@@ -7,6 +7,7 @@ use serde_json::json;
 
 struct JXRConfig {
     code_dir: String,
+    globs: Vec<String>,
 }
 
 // TODO
@@ -44,13 +45,18 @@ fn pop_if_empty_begin(results: &mut Vec<serde_json::Value>) {
     }
 }
 
-fn run_ripgrep(code_dir: &str, tree: &str, options: &Options) -> String {
+fn run_ripgrep(config: &JXRConfig, tree: &str, options: &Options) -> String {
     let mut command = Command::new("rg");
 
     // TODO: directory traversal attack!
-    command.current_dir(format!("{}/{}", code_dir, tree));
+    command.current_dir(format!("{}/{}", config.code_dir, tree));
 
     command.arg("--json");
+
+    for glob in &config.globs {
+        command.arg("--glob");
+        command.arg(glob);
+    }
 
     if let Some(filetype) = options.filetype.as_ref() {
         command.arg("--type");
@@ -111,7 +117,7 @@ fn parse_options(query: &str) -> Options {
 #[get("/search?<tree>&<query>")]
 fn search(config: &State<JXRConfig>, tree: &str, query: &str) -> String {
     let options = parse_options(query);
-    let grep_json = run_ripgrep(&config.code_dir, tree, &options);
+    let grep_json = run_ripgrep(config, tree, &options);
 
     println!("finished searching for {}", query);
     grep_json
@@ -132,6 +138,7 @@ fn rocket() -> _ {
     rocket::build()
         .manage(JXRConfig {
             code_dir: env::var("JXR_CODE_DIR").expect("JXR_CODE_DIR is not set"),
+            globs: vec!["!*.po".to_string(), "!*.pot".to_string()],
         })
         .mount("/", routes![search, trees])
 }
