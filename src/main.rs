@@ -5,6 +5,7 @@ use std::{env, fs, process::Command, sync::Mutex};
 use rocket::{routes, State};
 use serde_json::json;
 
+#[derive(Debug)]
 struct JXRState {
     code_dir: String,
     globs: Vec<String>,
@@ -87,7 +88,7 @@ fn run_ripgrep(config: &JXRState, tree: &str, options: &Options) -> String {
     json!(results).to_string()
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 struct Options {
     path: Option<String>,
     filetype: Option<String>,
@@ -109,9 +110,18 @@ fn parse_options(query: &str) -> Options {
             // TODO: implement with glob later
             options.filetype = Some(type_.to_string());
         } else {
-            options.pattern = Some(part.to_string());
+            let mut pattern: String = options.pattern.as_ref().unwrap_or(&String::new()).clone();
+
+            if !pattern.is_empty() {
+                pattern += " ";
+            }
+            pattern += part;
+
+            options.pattern = Some(pattern);
         }
     }
+
+    println!("Searching with options: {:?}", options);
 
     options
 }
@@ -125,7 +135,7 @@ fn search(config: &State<JXRState>, tree: &str, query: &str) -> String {
         .expect("unlocking global rg lock failed");
     let grep_json = run_ripgrep(config, tree, &options);
 
-    println!("finished searching for {}", query);
+    println!("Finished searching for {}", query);
     grep_json
 }
 
