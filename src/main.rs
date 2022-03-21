@@ -7,6 +7,7 @@ use serde_json::json;
 
 #[derive(Debug)]
 struct JXRState {
+    max_matches: usize,
     code_dir: String,
     globs: Vec<String>,
     global_rg_lock: Mutex<()>,
@@ -25,12 +26,14 @@ fn parse_result(line: &str, options: &Options) -> Option<serde_json::Value> {
         return None;
     }
 
-    if options.path.is_some() && json["type"].as_str() == Some("match") {
-        if json["data"]["path"]["text"]
-            .as_str()
-            .expect("result didn't have path")
-            .contains(options.path.as_ref().unwrap())
-        {
+    if json["type"].as_str() == Some("match") {
+        let has_text = json["data"]["lines"].get("text").is_some();
+        let in_path = !options.path.is_some()
+            || json["data"]["path"]["text"]
+                .as_str()
+                .expect("result didn't have path")
+                .contains(options.path.as_ref().unwrap());
+        if has_text && in_path {
             return Some(json);
         } else {
             return None;
@@ -55,6 +58,7 @@ fn run_ripgrep(config: &JXRState, tree: &str, options: &Options) -> String {
     command.current_dir(format!("{}/{}", config.code_dir, tree));
 
     command.arg("--json");
+    command.arg("--no-binary");
 
     for glob in &config.globs {
         command.arg("--glob");
@@ -70,19 +74,46 @@ fn run_ripgrep(config: &JXRState, tree: &str, options: &Options) -> String {
     command.arg(options.pattern.as_ref().expect("no search pattern"));
 
     let mut results: Vec<serde_json::Value> = vec![];
+    let mut truncated = false;
+    let mut matches = 0;
     let output = command.output().expect("failed to execute process").stdout;
     let output_utf8 = String::from_utf8(output).expect("rg did not return valid utf8");
     for line in output_utf8.lines() {
         if let Some(result) = parse_result(line, options) {
             let result_type = result["type"].as_str();
 
-            // summary will be last
-            if result_type == Some("begin") || result_type == Some("summary") {
-                pop_if_empty_begin(&mut results);
+            if matches >= config.max_matches {
+                truncated = true;
+                break;
+            }
+
+            match result_type {
+                Some("summary") => {
+                    break;
+                }
+                Some("match") => {
+                    matches += 1;
+                }
+                Some("begin") => {
+                    pop_if_empty_begin(&mut results);
+                }
+                _ => {}
             }
 
             results.push(result);
         }
+    }
+
+    let mut summary = parse_result(
+        output_utf8.lines().last().expect("no summary line"),
+        options,
+    )
+    .expect("summary line didn't parse");
+    summary["data"]["stats"]["truncated"] = json!(truncated);
+    results.push(summary);
+
+    if truncated {
+        println!("Truncated results to {}", config.max_matches);
     }
 
     json!(results).to_string()
@@ -153,6 +184,7 @@ fn trees(config: &State<JXRState>) -> String {
 fn rocket() -> _ {
     rocket::build()
         .manage(JXRState {
+            max_matches: 1_000,
             code_dir: env::var("JXR_CODE_DIR").expect("JXR_CODE_DIR is not set"),
             globs: vec!["!*.po".to_string(), "!*.pot".to_string()],
             global_rg_lock: Mutex::new(()),
