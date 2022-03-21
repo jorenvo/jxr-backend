@@ -2,6 +2,8 @@
 extern crate rocket;
 use std::{env, fs, process::Command, sync::Mutex};
 
+use rocket::http::Status;
+use rocket::response::status::Custom;
 use rocket::{routes, State};
 use serde_json::json;
 
@@ -51,7 +53,7 @@ fn pop_if_empty_begin(results: &mut Vec<serde_json::Value>) {
     }
 }
 
-fn run_ripgrep(config: &JXRState, tree: &str, options: &Options) -> String {
+fn run_ripgrep(config: &JXRState, tree: &str, options: &Options) -> Result<String, Custom<String>> {
     let mut command = Command::new("rg");
 
     // TODO: directory traversal attack!
@@ -76,8 +78,18 @@ fn run_ripgrep(config: &JXRState, tree: &str, options: &Options) -> String {
     let mut results: Vec<serde_json::Value> = vec![];
     let mut truncated = false;
     let mut matches = 0;
-    let output = command.output().expect("failed to execute process").stdout;
-    let output_utf8 = String::from_utf8(output).expect("rg did not return valid utf8");
+    let output = command.output().expect("failed to execute process");
+    if !output.status.success() {
+        return Err(Custom(
+            Status::InternalServerError,
+            format!(
+                "Ripgrep failed: {}",
+                String::from_utf8(output.stderr).unwrap()
+            ),
+        ));
+    }
+
+    let output_utf8 = String::from_utf8(output.stdout).expect("rg did not return valid utf8");
     for line in output_utf8.lines() {
         if let Some(result) = parse_result(line, options) {
             let result_type = result["type"].as_str();
@@ -116,7 +128,7 @@ fn run_ripgrep(config: &JXRState, tree: &str, options: &Options) -> String {
         println!("Truncated results to {}", config.max_matches);
     }
 
-    json!(results).to_string()
+    Ok(json!(results).to_string())
 }
 
 #[derive(Default, Debug)]
@@ -158,7 +170,7 @@ fn parse_options(query: &str) -> Options {
 }
 
 #[get("/search?<tree>&<query>")]
-fn search(config: &State<JXRState>, tree: &str, query: &str) -> String {
+fn search(config: &State<JXRState>, tree: &str, query: &str) -> Result<String, Custom<String>> {
     let options = parse_options(query);
     let _lock = config
         .global_rg_lock
