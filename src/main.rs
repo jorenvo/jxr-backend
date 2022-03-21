@@ -60,7 +60,6 @@ fn run_ripgrep(config: &JXRState, tree: &str, options: &Options) -> Result<Strin
     command.current_dir(format!("{}/{}", config.code_dir, tree));
 
     command.arg("--json");
-    command.arg("--no-binary");
 
     for glob in &config.globs {
         command.arg("--glob");
