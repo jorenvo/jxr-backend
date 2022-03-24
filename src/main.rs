@@ -197,6 +197,26 @@ fn trees(config: &State<JXRState>) -> Result<String, Error> {
     Ok(json!(paths).to_string())
 }
 
+#[get("/head?<tree>")]
+fn git_head(config: &State<JXRState>, tree: &str) -> Result<String, Custom<String>> {
+    let mut command = Command::new("git");
+
+    // TODO: directory traversal attack!
+    command.current_dir(format!("{}/{}", config.code_dir, tree));
+
+    command.args(["rev-parse", "HEAD"]);
+
+    let output = command.output().expect("failed to execute process");
+    if !output.status.success() {
+        return Err(Custom(
+            Status::InternalServerError,
+            format!("Git failed: {}", String::from_utf8(output.stderr).unwrap()),
+        ));
+    }
+
+    Ok(String::from_utf8(output.stdout).expect("rg did not return valid utf8"))
+}
+
 #[launch]
 fn rocket() -> _ {
     rocket::build()
@@ -206,5 +226,5 @@ fn rocket() -> _ {
             globs: vec!["!*.po".to_string(), "!*.pot".to_string()],
             global_rg_lock: Mutex::new(()),
         })
-        .mount("/", routes![search, trees])
+        .mount("/", routes![search, trees, git_head])
 }
