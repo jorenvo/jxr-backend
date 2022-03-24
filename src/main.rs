@@ -1,5 +1,6 @@
 #[macro_use]
 extern crate rocket;
+use std::io::Error;
 use std::{env, fs, process::Command, sync::Mutex};
 
 use rocket::http::Status;
@@ -182,13 +183,18 @@ fn search(config: &State<JXRState>, tree: &str, query: &str) -> Result<String, C
 }
 
 #[get("/trees")]
-fn trees(config: &State<JXRState>) -> String {
-    let paths = fs::read_dir(&config.code_dir).unwrap();
-    let paths: Vec<String> = paths
-        .map(|p| p.unwrap().file_name().to_str().unwrap().to_string())
+fn trees(config: &State<JXRState>) -> Result<String, Error> {
+    let mut paths: Vec<String> = fs::read_dir(&config.code_dir)?
+        .filter(|p| p.is_ok())
+        .map(|p| p.unwrap())
+        .filter(|entry| entry.file_type().unwrap().is_dir())
+        .map(|entry| entry.file_name().to_str().unwrap().to_string())
+        .filter(|dir_name| !dir_name.starts_with('.'))
         .collect();
 
-    json!(paths).to_string()
+    paths.sort();
+
+    Ok(json!(paths).to_string())
 }
 
 #[launch]
