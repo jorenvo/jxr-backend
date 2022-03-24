@@ -31,7 +31,7 @@ fn parse_result(line: &str, options: &Options) -> Option<serde_json::Value> {
 
     if json["type"].as_str() == Some("match") {
         let has_text = json["data"]["lines"].get("text").is_some();
-        let in_path = !options.path.is_some()
+        let in_path = options.path.is_none()
             || json["data"]["path"]["text"]
                 .as_str()
                 .expect("result didn't have path")
