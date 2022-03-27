@@ -214,7 +214,7 @@ fn git_head(config: &State<JXRState>, tree: &str) -> Result<String, Custom<Strin
         ));
     }
 
-    Ok(String::from_utf8(output.stdout).expect("rg did not return valid utf8"))
+    Ok(json!(String::from_utf8(output.stdout).expect("rg did not return valid utf8")).to_string())
 }
 
 #[launch]
