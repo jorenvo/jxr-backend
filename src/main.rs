@@ -217,6 +217,30 @@ fn git_head(config: &State<JXRState>, tree: &str) -> Result<String, Custom<Strin
     Ok(json!(String::from_utf8(output.stdout).expect("rg did not return valid utf8").trim()).to_string())
 }
 
+#[get("/github?<tree>")]
+fn github(config: &State<JXRState>, tree: &str) -> Result<String, Custom<String>> {
+    let mut command = Command::new("git");
+
+    // TODO: directory traversal attack!
+    command.current_dir(format!("{}/{}", config.code_dir, tree));
+
+    command.args(["config", "--get", "remote.origin.url"]);
+
+    let output = command.output().expect("failed to execute process");
+    if !output.status.success() {
+        return Err(Custom(
+            Status::InternalServerError,
+            format!("Git failed: {}", String::from_utf8(output.stderr).unwrap()),
+        ));
+    }
+
+    // TODO: handle public remote URL
+    // Will return something like:
+    // git@github.com:jorenvo/jxr-backend.git
+    let remote = String::from_utf8(output.stdout).expect("rg did not return valid utf8");
+    Ok(json!(remote.replace("git@github.com:", "").replace(".git", "").trim()).to_string())
+}
+
 #[launch]
 fn rocket() -> _ {
     rocket::build()
@@ -226,5 +250,5 @@ fn rocket() -> _ {
             globs: vec!["!*.po".to_string(), "!*.pot".to_string()],
             global_rg_lock: Mutex::new(()),
         })
-        .mount("/", routes![search, trees, git_head])
+        .mount("/", routes![search, trees, git_head, github])
 }
