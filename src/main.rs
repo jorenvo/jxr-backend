@@ -1,7 +1,6 @@
 #[macro_use]
 extern crate rocket;
 use std::io::Error;
-use std::process::Output;
 use std::{env, fs, process::Command, sync::Mutex};
 
 use rocket::http::Status;
@@ -170,10 +169,10 @@ fn parse_options(query: &str) -> Options {
     options
 }
 
-fn http_error(output: Output) -> Result<String, Custom<String>> {
+fn http_error(msg: &str) -> Result<String, Custom<String>> {
     Err(Custom(
         Status::InternalServerError,
-        format!("Git failed: {}", String::from_utf8(output.stderr).unwrap()),
+        format!("Git failed: {}", msg),
     ))
 }
 
@@ -205,18 +204,36 @@ fn trees(config: &State<JXRState>) -> Result<String, Error> {
     Ok(json!(paths).to_string())
 }
 
-#[get("/head?<tree>")]
-fn git_head(config: &State<JXRState>, tree: &str) -> Result<String, Custom<String>> {
+fn find_repo(path: &str) -> Result<String, ()> {
+    let mut parent = String::new();
+
+    for part in path.split('/') {
+        parent.push_str(part);
+        if fs::read_dir(parent.clone() + "/.git").is_ok() {
+            return Ok(parent);
+        }
+    }
+
+    Err(())
+}
+
+#[get("/head?<path>")]
+fn git_head(config: &State<JXRState>, path: &str) -> Result<String, Custom<String>> {
     let mut command = Command::new("git");
 
+    let repo_path = find_repo(path);
+    if repo_path.is_err() {
+        return http_error("no git repo in tree");
+    }
+
     // TODO: directory traversal attack!
-    command.current_dir(format!("{}/{}", config.code_dir, tree));
+    command.current_dir(format!("{}/{}", config.code_dir, repo_path.unwrap()));
 
     command.args(["rev-parse", "HEAD"]);
 
     let output = command.output().expect("failed to execute process");
     if !output.status.success() {
-        return http_error(output);
+        return http_error(&String::from_utf8(output.stderr).unwrap());
     }
 
     Ok(json!(String::from_utf8(output.stdout)
@@ -225,18 +242,23 @@ fn git_head(config: &State<JXRState>, tree: &str) -> Result<String, Custom<Strin
     .to_string())
 }
 
-#[get("/github?<tree>")]
-fn github(config: &State<JXRState>, tree: &str) -> Result<String, Custom<String>> {
+#[get("/github?<path>")]
+fn github(config: &State<JXRState>, path: &str) -> Result<String, Custom<String>> {
     let mut command = Command::new("git");
 
+    let repo_path = find_repo(path);
+    if repo_path.is_err() {
+        return http_error("no git repo in tree");
+    }
+
     // TODO: directory traversal attack!
-    command.current_dir(format!("{}/{}", config.code_dir, tree));
+    command.current_dir(format!("{}/{}", config.code_dir, repo_path.unwrap()));
 
     command.args(["config", "--get", "remote.origin.url"]);
 
     let output = command.output().expect("failed to execute process");
     if !output.status.success() {
-        return http_error(output);
+        return http_error(&String::from_utf8(output.stderr).unwrap());
     }
 
     // TODO: handle public remote URL
