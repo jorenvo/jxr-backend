@@ -209,6 +209,7 @@ fn find_repo(path: &str) -> Result<String, ()> {
 
     for part in path.split('/') {
         parent.push_str(part);
+        parent.push('/');
         if fs::read_dir(parent.clone() + "/.git").is_ok() {
             return Ok(parent);
         }
@@ -221,13 +222,14 @@ fn find_repo(path: &str) -> Result<String, ()> {
 fn git_head(config: &State<JXRState>, path: &str) -> Result<String, Custom<String>> {
     let mut command = Command::new("git");
 
-    let repo_path = find_repo(path);
+    // TODO: directory traversal attack!
+    let full_path = format!("{}/{}", config.code_dir, path);
+    let repo_path = find_repo(&full_path);
     if repo_path.is_err() {
         return http_error("no git repo in tree");
     }
 
-    // TODO: directory traversal attack!
-    command.current_dir(format!("{}/{}", config.code_dir, repo_path.unwrap()));
+    command.current_dir(repo_path.unwrap());
 
     command.args(["rev-parse", "HEAD"]);
 
@@ -246,13 +248,14 @@ fn git_head(config: &State<JXRState>, path: &str) -> Result<String, Custom<Strin
 fn github(config: &State<JXRState>, path: &str) -> Result<String, Custom<String>> {
     let mut command = Command::new("git");
 
-    let repo_path = find_repo(path);
+    // TODO: directory traversal attack!
+    let full_path = format!("{}/{}", config.code_dir, path);
+    let repo_path = find_repo(&full_path);
     if repo_path.is_err() {
         return http_error("no git repo in tree");
     }
 
-    // TODO: directory traversal attack!
-    command.current_dir(format!("{}/{}", config.code_dir, repo_path.unwrap()));
+    command.current_dir(repo_path.unwrap());
 
     command.args(["config", "--get", "remote.origin.url"]);
 
