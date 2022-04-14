@@ -214,7 +214,10 @@ fn git_head(config: &State<JXRState>, tree: &str) -> Result<String, Custom<Strin
         ));
     }
 
-    Ok(json!(String::from_utf8(output.stdout).expect("rg did not return valid utf8").trim()).to_string())
+    Ok(json!(String::from_utf8(output.stdout)
+        .expect("rg did not return valid utf8")
+        .trim())
+    .to_string())
 }
 
 #[get("/github?<tree>")]
@@ -238,7 +241,11 @@ fn github(config: &State<JXRState>, tree: &str) -> Result<String, Custom<String>
     // Will return something like:
     // git@github.com:jorenvo/jxr-backend.git
     let remote = String::from_utf8(output.stdout).expect("rg did not return valid utf8");
-    Ok(json!(remote.replace("git@github.com:", "").replace(".git", "").trim()).to_string())
+    Ok(json!(remote
+        .replace("git@github.com:", "")
+        .replace(".git", "")
+        .trim())
+    .to_string())
 }
 
 #[launch]
