@@ -1,6 +1,7 @@
 #[macro_use]
 extern crate rocket;
 use std::io::Error;
+use std::process::Output;
 use std::{env, fs, process::Command, sync::Mutex};
 
 use rocket::http::Status;
@@ -169,6 +170,13 @@ fn parse_options(query: &str) -> Options {
     options
 }
 
+fn http_error(output: Output) -> Result<String, Custom<String>> {
+    Err(Custom(
+        Status::InternalServerError,
+        format!("Git failed: {}", String::from_utf8(output.stderr).unwrap()),
+    ))
+}
+
 #[get("/search?<tree>&<query>")]
 fn search(config: &State<JXRState>, tree: &str, query: &str) -> Result<String, Custom<String>> {
     let options = parse_options(query);
@@ -208,10 +216,7 @@ fn git_head(config: &State<JXRState>, tree: &str) -> Result<String, Custom<Strin
 
     let output = command.output().expect("failed to execute process");
     if !output.status.success() {
-        return Err(Custom(
-            Status::InternalServerError,
-            format!("Git failed: {}", String::from_utf8(output.stderr).unwrap()),
-        ));
+        return http_error(output);
     }
 
     Ok(json!(String::from_utf8(output.stdout)
@@ -231,10 +236,7 @@ fn github(config: &State<JXRState>, tree: &str) -> Result<String, Custom<String>
 
     let output = command.output().expect("failed to execute process");
     if !output.status.success() {
-        return Err(Custom(
-            Status::InternalServerError,
-            format!("Git failed: {}", String::from_utf8(output.stderr).unwrap()),
-        ));
+        return http_error(output);
     }
 
     // TODO: handle public remote URL
