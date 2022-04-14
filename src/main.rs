@@ -218,6 +218,23 @@ fn find_repo(path: &str) -> Result<String, ()> {
     Err(())
 }
 
+#[get("/root?<path>")]
+fn git_root(config: &State<JXRState>, path: &str) -> Result<String, Custom<String>> {
+    // TODO: directory traversal attack!
+    let full_path = format!("{}/{}", config.code_dir, path);
+    let repo_path = find_repo(&full_path);
+    if repo_path.is_err() {
+        return http_error("no git repo in tree");
+    }
+
+    let full_path = repo_path.unwrap();
+    let stripped = full_path
+        .strip_prefix(&format!("{}/", config.code_dir))
+        .unwrap();
+
+    Ok(json!(stripped).to_string())
+}
+
 #[get("/head?<path>")]
 fn git_head(config: &State<JXRState>, path: &str) -> Result<String, Custom<String>> {
     let mut command = Command::new("git");
@@ -284,5 +301,5 @@ fn rocket() -> _ {
             globs: vec!["!*.po".to_string(), "!*.pot".to_string()],
             global_rg_lock: Mutex::new(()),
         })
-        .mount("/", routes![search, trees, git_head, github])
+        .mount("/", routes![search, trees, git_head, git_root, github])
 }
