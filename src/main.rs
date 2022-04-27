@@ -75,6 +75,8 @@ fn run_ripgrep(config: &JXRState, tree: &str, options: &Options) -> Result<Strin
     // TODO: error properly here
     command.arg(options.pattern.as_ref().expect("no search pattern"));
 
+    println!("Running ripgrep: {:?}", command);
+
     let mut results: Vec<serde_json::Value> = vec![];
     let mut truncated = false;
     let mut matches = 0;
@@ -228,6 +230,11 @@ fn git_root(config: &State<JXRState>, path: &str) -> Result<String, Custom<Strin
     }
 
     let full_path = repo_path.unwrap();
+    println!(
+        "Stripping {} from {}",
+        &format!("{}/", config.code_dir),
+        full_path
+    );
     let stripped = full_path
         .strip_prefix(&format!("{}/", config.code_dir))
         .unwrap();
