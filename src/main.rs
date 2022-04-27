@@ -54,6 +54,25 @@ fn pop_if_empty_begin(results: &mut Vec<serde_json::Value>) {
     }
 }
 
+fn get_ripgrep_output(command: &mut Command) -> Result<Vec<u8>, Custom<String>> {
+    let output = command.output().expect("failed to execute process");
+    if !output.status.success() {
+        return Err(Custom(
+            Status::InternalServerError,
+            format!(
+                "Ripgrep failed: {}",
+                String::from_utf8(output.stderr).unwrap()
+            ),
+        ));
+    }
+
+    return Ok(output.stdout);
+}
+
+fn convert_to_utf8(bytes: Vec<u8>) -> String {
+    String::from_utf8(bytes).expect("rg did not return valid utf8")
+}
+
 fn run_ripgrep(config: &JXRState, tree: &str, options: &Options) -> Result<String, Custom<String>> {
     let mut command = Command::new("rg");
 
@@ -76,22 +95,12 @@ fn run_ripgrep(config: &JXRState, tree: &str, options: &Options) -> Result<Strin
     command.arg(options.pattern.as_ref().expect("no search pattern"));
 
     println!("Running ripgrep: {:?}", command);
+    let output = get_ripgrep_output(&mut command).unwrap();
+    let output_utf8 = convert_to_utf8(output);
 
     let mut results: Vec<serde_json::Value> = vec![];
     let mut truncated = false;
     let mut matches = 0;
-    let output = command.output().expect("failed to execute process");
-    if !output.status.success() {
-        return Err(Custom(
-            Status::InternalServerError,
-            format!(
-                "Ripgrep failed: {}",
-                String::from_utf8(output.stderr).unwrap()
-            ),
-        ));
-    }
-
-    let output_utf8 = String::from_utf8(output.stdout).expect("rg did not return valid utf8");
     for line in output_utf8.lines() {
         if let Some(result) = parse_result(line, options) {
             let result_type = result["type"].as_str();
