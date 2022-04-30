@@ -229,7 +229,7 @@ fn find_repo(path: &str) -> Result<String, ()> {
     Err(())
 }
 
-#[get("/root?<path>")]
+#[get("/gitroot?<path>")]
 fn git_root(config: &State<JXRState>, path: &str) -> Result<String, Custom<String>> {
     // TODO: directory traversal attack!
     let full_path = format!("{}/{}", config.code_dir, path);
