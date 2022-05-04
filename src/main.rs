@@ -66,7 +66,7 @@ fn get_ripgrep_output(command: &mut Command) -> Result<Vec<u8>, Custom<String>> 
         ));
     }
 
-    return Ok(output.stdout);
+    Ok(output.stdout)
 }
 
 fn convert_to_utf8(bytes: Vec<u8>) -> String {
