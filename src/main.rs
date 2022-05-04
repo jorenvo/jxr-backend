@@ -56,7 +56,7 @@ fn pop_if_empty_begin(results: &mut Vec<serde_json::Value>) {
 
 fn get_ripgrep_output(command: &mut Command) -> Result<Vec<u8>, Custom<String>> {
     let output = command.output().expect("failed to execute process");
-    if !output.status.success() {
+    if output.status.code().is_none() || output.status.code() == Some(2) {  // rg returns 1 when no matches are found
         return Err(Custom(
             Status::InternalServerError,
             format!(
